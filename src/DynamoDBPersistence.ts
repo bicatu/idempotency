@@ -44,8 +44,6 @@ export class DynamoDBPersistence implements Persistence {
             if (e instanceof DynamoDBServiceException && e.name === 'ConditionalCheckFailedException') {
                 return false;
             }
-
-            // TODO - think on the other exceptions and perhaps define a generic error to use
             throw e;
         }
 
