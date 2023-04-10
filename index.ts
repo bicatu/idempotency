@@ -28,8 +28,6 @@ const config: Config = {
     }
 }
 
-const persistence = new InMemoryPersistence(config.ttl);
-
 const idempotency = new Idempotency(new DynamoDBPersistence(new DynamoDBClient({ region: 'us-east-1', endpoint: 'http://localhost:8000'}), { ttl: config.ttl, tableName: 'idempotency' }), config);
 
 const myUseCase = (input: Input): Output => {
