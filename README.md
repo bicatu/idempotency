@@ -23,7 +23,7 @@ The goal is to be able to support different persistence mechanisms. It is import
 The schema is as follows:
 PK = use case name
 
-SK = The itempotency key. 
+SK = The itempotency key.
 
 status = in progress, completed
 

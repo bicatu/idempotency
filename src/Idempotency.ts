@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { IdempotencyKeyAlreadyExistsError } from './Errors';
+import { UseCaseAlreadyInProgressError } from './Errors';
 
 export const md5 = (input: string): string => {
     return crypto.createHash('md5').update(input).digest('hex');
@@ -12,6 +12,11 @@ export type Config = {
   
 export type IdempotencyStatus = 'in progress' | 'completed' | 'unknown';
   
+export type PersistenceRecord = {
+  status: IdempotencyStatus;
+  resultData: any;
+  expiration: number;
+}
 export interface Persistence {
       add(useCase: string, key: string, status: IdempotencyStatus): Promise<boolean>;
       update(useCase: string, key: string, status: IdempotencyStatus, data: any): Promise<void>;
@@ -32,18 +37,21 @@ export class Idempotency {
         return md5(JSON.stringify(input));
       }
   
-      async add(useCase: string, input: any): Promise<void> {
+      async add<T>(useCase: string, input: any): Promise<T> {
         const idempotencyKey = this.getIdempotencyKey(input);
 
         if (! await this.persistence.add(useCase, idempotencyKey, 'in progress')) {
+            // Since we could not add, it is either in progress or completed
             const item = await this.persistence.get(useCase, idempotencyKey);
 
-                throw new IdempotencyKeyAlreadyExistsError(
-                    useCase,
-                    idempotencyKey,
-                    item.status, 
-                    item.resultData
-                );
+            if (item.status === 'completed') {
+              return item.resultData as T;
+            }
+
+            throw new UseCaseAlreadyInProgressError(
+                useCase,
+                idempotencyKey,
+            );
         };
       }
   

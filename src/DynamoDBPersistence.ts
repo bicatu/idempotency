@@ -1,19 +1,11 @@
 import { DynamoDBClient, UpdateItemCommand, PutItemCommand, GetItemCommand, DeleteItemCommand, DynamoDBServiceException } from "@aws-sdk/client-dynamodb";
-import { UnableToRemoveIdempotencyKeyError } from "./Errors";
-import { IdempotencyStatus, Persistence } from "./Idempotency";
+import { PeristenceError, UnableToRemoveIdempotencyKeyError, UnknownUseCaseError } from "./Errors";
+import { IdempotencyStatus, Persistence, PersistenceRecord } from "./Idempotency";
 
 
 export type DynamoDBPersistenceConfig = {
     ttl: number;
     tableName: string;
-}
-
-export type DynamoDBPersistenceRecord = {
-    PK: string;
-    SK: string;
-    status: IdempotencyStatus;
-    resultData: any;
-    expiration: number;
 }
 
 export class DynamoDBPersistence implements Persistence {
@@ -48,10 +40,9 @@ export class DynamoDBPersistence implements Persistence {
         }
 
         return true;
-
     }
 
-    async get(useCase: string, key: string): Promise<DynamoDBPersistenceRecord> {
+    async get(useCase: string, key: string): Promise<PersistenceRecord> {
         const getCommand = new GetItemCommand({
             TableName: this.config.tableName,
             Key: {
@@ -63,16 +54,17 @@ export class DynamoDBPersistence implements Persistence {
         try {
             const item = await this.client.send(getCommand);
 
+            if (item.Item === undefined) {
+                throw new UnknownUseCaseError(useCase, key);
+            }
+
             return {
-                PK: item.Item.PK.S,
-                SK: item.Item.SK.S,
                 status: item.Item.status.S as IdempotencyStatus,
                 resultData: item.Item.resultData ? JSON.parse(item.Item.resultData.S) : null,
                 expiration: parseInt(item.Item.expiration.N),
             };
         } catch (e) {
-            // TODO - think on the other exceptions
-            throw e;
+            throw new PeristenceError(useCase, key, e.message);
         }
         
     }
@@ -105,7 +97,6 @@ export class DynamoDBPersistence implements Persistence {
                 throw new UnableToRemoveIdempotencyKeyError(useCase, key);
             }
         }
-
     }
     
     async delete(useCase: string, key: string): Promise<void> {
@@ -120,7 +111,6 @@ export class DynamoDBPersistence implements Persistence {
 
         try {
             await this.client.send(command);
-            console.log('deleted');
         } catch (e) {
             if(e instanceof DynamoDBServiceException && e.name === 'ResourceNotFoundException') {
                 throw new UnableToRemoveIdempotencyKeyError(useCase, key);
