@@ -31,6 +31,7 @@ const idempotency = new Idempotency(new DynamoDBPersistence(new DynamoDBClient({
 
 // The use case we would execute
 const myUseCase = (input: Input): Output => {
+    console.log('Executing use case: ', input);
     return {
         id: 1,
         name: input.name,
@@ -43,7 +44,7 @@ const myUseCase = (input: Input): Output => {
     const useCase = 'my-use-case';
     let input: Input = {
         name: 'John Doe Dorian',
-        age: 43,
+        age: 18,
         createdAt: new Date()
     };
 
@@ -54,7 +55,7 @@ const myUseCase = (input: Input): Output => {
         // Start the idempotency process
         result = await idempotency.add<Output>(useCase, input);
 
-        if (result !== undefined) {
+        if (result === undefined) {
             // execute the use case
             result = myUseCase(input);
         
@@ -62,7 +63,7 @@ const myUseCase = (input: Input): Output => {
             await idempotency.complete(useCase, input, result);
         }
 
-        return result;
+        console.log('Result => ', result);
     } catch(e) {
         // If we failed because the use case is still being executed we have to return something to the requester to indicate that
         if (! (e instanceof UseCaseAlreadyInProgressError)) {
@@ -71,11 +72,11 @@ const myUseCase = (input: Input): Output => {
 
             // Do your application normal error handling
             console.log('Error: ', e);
-            return { code: 500, message: `Internal server error: ${e.message}` };
+            console.log({ code: 500, message: `Internal server error: ${e.message}` });
         }
 
         // Return an error indicating the use case is still being executed
         console.log('Use case is still being executed');
-        return { code: 409, message: 'Use case is still being executed' }
+        console.log({ code: 409, message: 'Use case is still being executed' });
     } 
 })();

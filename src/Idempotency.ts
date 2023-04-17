@@ -57,13 +57,11 @@ export class Idempotency {
   
       async complete(useCase: string, input: any, result: any): Promise<void> {
         const idempotencyKey = this.getIdempotencyKey(input);
-  
         await this.persistence.update(useCase, idempotencyKey, 'completed', result);
       }
   
       async remove(useCase: string, input: any): Promise<void> {
         const idempotencyKey = this.getIdempotencyKey(input);
-  
         await this.persistence.delete(useCase, idempotencyKey);
       }
   }

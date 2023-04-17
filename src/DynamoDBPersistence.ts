@@ -1,4 +1,4 @@
-import { DynamoDBClient, UpdateItemCommand, PutItemCommand, GetItemCommand, DeleteItemCommand, DynamoDBServiceException } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, UpdateItemCommand, GetItemCommand, DeleteItemCommand, DynamoDBServiceException } from "@aws-sdk/client-dynamodb";
 import { PeristenceError, UnableToRemoveIdempotencyKeyError, UnknownUseCaseError } from "./Errors";
 import { IdempotencyStatus, Persistence, PersistenceRecord } from "./Idempotency";
 
@@ -15,18 +15,24 @@ export class DynamoDBPersistence implements Persistence {
     async add(useCase: string, key: string, status: IdempotencyStatus): Promise<boolean> {
         const now = new Date().getTime();
 
-        const command = new PutItemCommand({
+        const command = new UpdateItemCommand({
             TableName: this.config.tableName,
-            Item: {
+            Key: {
                 PK: { S: useCase },
                 SK: { S: key },
-                status: { S: status },
-                expiration: { N: (now + this.config.ttl * 1000).toString() },
-                createdAt: { S: new Date().toISOString() },
             },
+            UpdateExpression: 'SET #status = :status, #expiration = :expiration, #createdAt = :createdAt',
             ConditionExpression: "(attribute_not_exists(PK) AND attribute_not_exists(SK)) OR (attribute_exists(PK) AND attribute_exists(SK) AND expiration < :now)",
+            ExpressionAttributeNames: {
+                "#status": "status",
+                "#expiration": "expiration",
+                "#createdAt": "createdAt",
+            },
             ExpressionAttributeValues: {
                 ":now": { N: now.toString() },
+                ":status": { S: status },
+                ":expiration": { N: (now + this.config.ttl * 1000).toString() },
+                ":createdAt": { S: new Date().toISOString() },
             },
         });
         
@@ -96,6 +102,7 @@ export class DynamoDBPersistence implements Persistence {
             if (e instanceof DynamoDBServiceException && e.name === 'ConditionalCheckFailedException') {
                 throw new UnableToRemoveIdempotencyKeyError(useCase, key);
             }
+            throw e;
         }
     }
     
