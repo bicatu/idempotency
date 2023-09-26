@@ -1,5 +1,3 @@
-Add the possibility to pass already an idempotency key
+Things we can do to improve:
 
-Review the Java version to see what other things we can do
-
-Add tests
+- Review the Java version to see what other things we can do
