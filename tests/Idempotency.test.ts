@@ -28,7 +28,7 @@ describe('Idempotency', () => {
       const input = { foo: 'bar' };
       const idempotencyKey = md5(JSON.stringify(input));
 
-      mockPersistence.add.mockResolvedValueOnce(true);
+      (mockPersistence.add as jest.Mock).mockResolvedValueOnce(true);
       await idempotency.add(useCase, input);
 
       expect(mockPersistence.add).toHaveBeenCalledWith(useCase, idempotencyKey, 'in progress');
@@ -40,8 +40,8 @@ describe('Idempotency', () => {
       const idempotencyKey = md5(JSON.stringify(input));
       const record: PersistenceRecord = { status: 'in progress', resultData: null, expiration: 0 };
 
-      mockPersistence.add.mockResolvedValueOnce(false);
-      mockPersistence.get.mockResolvedValueOnce(record);
+      (mockPersistence.add as jest.Mock).mockResolvedValueOnce(false);
+      (mockPersistence.get as jest.Mock).mockResolvedValueOnce(record);
 
       await expect(idempotency.add(useCase, input)).rejects.toThrow(UseCaseAlreadyInProgressError);
       expect(mockPersistence.add).toHaveBeenCalledWith(useCase, idempotencyKey, 'in progress');
@@ -55,8 +55,8 @@ describe('Idempotency', () => {
       const result = { baz: 'qux' };
       const record: PersistenceRecord = { status: 'completed', resultData: result, expiration: 0 };
 
-      mockPersistence.add.mockResolvedValueOnce(false);
-      mockPersistence.get.mockResolvedValueOnce(record);
+      (mockPersistence.add as jest.Mock).mockResolvedValueOnce(false);
+      (mockPersistence.get as jest.Mock).mockResolvedValueOnce(record);
 
       const output = await idempotency.add(useCase, input);
 
@@ -75,7 +75,7 @@ describe('Idempotency', () => {
 
       await idempotency.complete(useCase, input, result);
 
-      expect(mockPersistence.delete).toHaveBeenCalledWith(useCase, idempotencyKey, 'completed', result);
+      expect(mockPersistence.update).toHaveBeenCalledWith(useCase, idempotencyKey, 'completed', result);
     });
   });
 
