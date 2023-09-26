@@ -21,11 +21,15 @@ export interface Persistence {
       add(useCase: string, key: string, status: IdempotencyStatus): Promise<boolean>;
       update(useCase: string, key: string, status: IdempotencyStatus, data: any): Promise<void>;
       delete(useCase: string, key: string): Promise<void>;
-      get(useCase: string, key: string): Promise<any>;
+      get(useCase: string, key: string): Promise<PersistenceRecord>;
   }
 
 export class Idempotency {
       constructor(private readonly persistence: Persistence, private readonly config: Config) {
+      }
+
+      private isCompleted(item: PersistenceRecord): boolean {
+        return item.status === 'completed';
       }
   
       private getIdempotencyKey(input: any): string {
@@ -37,14 +41,14 @@ export class Idempotency {
         return md5(JSON.stringify(input));
       }
   
-      async add<T>(useCase: string, input: any): Promise<T> {
+      async add<T>(useCase: string, input: any): Promise<T | undefined> {
         const idempotencyKey = this.getIdempotencyKey(input);
 
         if (! await this.persistence.add(useCase, idempotencyKey, 'in progress')) {
             // Since we could not add, it is either in progress or completed
             const item = await this.persistence.get(useCase, idempotencyKey);
 
-            if (item.status === 'completed') {
+            if (this.isCompleted(item)) {
               return item.resultData as T;
             }
 
