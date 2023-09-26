@@ -6,6 +6,10 @@ export abstract class IdempotencyError extends Error {
     constructor(message: string, public readonly code: IdempotencyErrorCode, public readonly status: IdempotencyStatus, public readonly result?: any) {
         super(message);
     }
+
+    public static isAlreadyInProgressError(error: any): boolean {
+        return error instanceof UseCaseAlreadyInProgressError || error.code === 'UseCaseAlreadyInProgress';
+    }
 } 
 
 export class UnableToRemoveIdempotencyKeyError extends IdempotencyError {
