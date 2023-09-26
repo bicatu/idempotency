@@ -9,7 +9,7 @@ type Input = {
     createdAt: Date;
 }
 
-type Output = {
+type Result = {
     id: number;
     name: string;
     age: number;
@@ -30,7 +30,7 @@ const config: Config = {
 const idempotency = new Idempotency(new DynamoDBPersistence(new DynamoDBClient({ region: 'us-east-1', endpoint: 'http://localhost:8000'}), { ttl: config.ttl, tableName: 'idempotency' }), config);
 
 // The use case we would execute
-const myUseCase = (input: Input): Output => {
+const myUseCase = (input: Input): Result => {
     console.log('Executing use case: ', input);
     return {
         id: 1,
@@ -44,16 +44,15 @@ const myUseCase = (input: Input): Output => {
     const useCase = 'my-use-case';
     let input: Input = {
         name: 'John Doe Dorian',
-        age: 18,
+        age: 19,
         createdAt: new Date()
     };
 
-    let result: Output | undefined;
-    let error: Error | IdempotencyError | undefined;
+    let result: Result | undefined;
 
     try {
         // Start the idempotency process
-        result = await idempotency.add<Output>(useCase, input);
+        result = await idempotency.add<Result>(useCase, input);
 
         if (result === undefined) {
             // execute the use case
@@ -63,16 +62,21 @@ const myUseCase = (input: Input): Output => {
             await idempotency.complete(useCase, input, result);
         }
 
+        // Do your application normal flow and return the result
         console.log('Result => ', result);
     } catch(e) {
-        // If we failed because the use case is still being executed we have to return something to the requester to indicate that
-        if (! (e instanceof UseCaseAlreadyInProgressError)) {
-            // If the idempotency process fails, we remove the record from the persistence layer
+        // Either the use case is still in progress or it failed altogether
+        if (e.code != 'UseCaseAlreadyInProgress') {
+            // Since it is not in progress, the use case failed.
+            // We remove the idempotency record so we can try again
             await idempotency.remove(useCase, input);
 
             // Do your application normal error handling
             console.log('Error: ', e);
+
+            // Return an error indicating the use case failed
             console.log({ code: 500, message: `Internal server error: ${e.message}` });
+            return;
         }
 
         // Return an error indicating the use case is still being executed
