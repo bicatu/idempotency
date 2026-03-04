@@ -1,7 +1,14 @@
 import { DynamoDBClient, CreateTableCommand, CreateTableCommandInput, DeleteTableCommandInput, DeleteTableCommand } from "@aws-sdk/client-dynamodb";
 const REGION = "us-east-1";
 
-const client = new DynamoDBClient({ region: REGION, endpoint: "http://localhost:8000" });
+const client = new DynamoDBClient({
+  region: REGION,
+  endpoint: "http://localhost:8000",
+  credentials: {
+    accessKeyId: "DUMMYIDEXAMPLE",
+    secretAccessKey: "DUMMYEXAMPLEKEY",
+  },
+});
 
 const createTable = async () => {
   const params: CreateTableCommandInput = {
@@ -38,9 +45,17 @@ const deleteTable = async () => {
 const run = async () => {
     try {
       await deleteTable();
+    } catch (err: any) {
+      if (err.__type !== "com.amazonaws.dynamodb.v20120810#ResourceNotFoundException") {
+        console.log("Error deleting table", err);
+        process.exit(1);
+      }
+    }
+    try {
       await createTable();
     } catch (err) {
-      console.log("Error", err);
+      console.log("Error creating table", err);
+      process.exit(1);
     }
   };
 
